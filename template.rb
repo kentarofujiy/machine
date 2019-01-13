@@ -13,7 +13,7 @@ def add_template_repository_to_source_path
     at_exit { FileUtils.remove_entry(tempdir) }
     git clone: [
       "--quiet",
-      "https://github.com/kentarofujiy/jumpstart.git",
+      "https://github.com/kentarofujiy/machine.git",
       tempdir
     ].map(&:shellescape).join(" ")
 
@@ -24,6 +24,52 @@ def add_template_repository_to_source_path
     source_paths.unshift(File.dirname(__FILE__))
   end
 end
+remove_file "README.rdoc"
+create_file "README.md", "Development: run ./bin/setup"
+
+database_file = <<-FILE
+default: &default
+  adapter: sqlite3
+  pool: 5
+  timeout: 5000
+
+development:
+  <<: *default
+  database: db/development.sqlite3
+
+# Warning: The database defined as "test" will be erased and
+# re-generated from your development database when you run "rake".
+# Do not set this db to the same as development or production.
+test:
+  <<: *default
+  database: db/test.sqlite3
+
+production:
+  <<: *default
+  database: db/production.sqlite3
+FILE
+
+create_file 'config/database.yml', ERB.new(database_file).result(binding), force: true
+
+# Remove unwanted gems. spring will be added later in the development group of gems
+%w(spring coffee-rails sqlite3).each do |unwanted_gem|
+  gsub_file("Gemfile", /gem '#{unwanted_gem}'.*\n/, '')
+end
+
+# remove commented lines
+gsub_file("Gemfile", /#.*\n/, '')
+# remove double newlines
+gsub_file("Gemfile", /^\n\n/, '')
+
+simple_form_installation = "simple_form:install"
+
+if yes?('Use bootstrap?')
+  gem 'bootstrap-sass'
+  simple_form_installation << " --bootstrap"
+end
+
+generate simple_form_installation
+
 
 def add_gems
   gem 'administrate', '~> 0.10.0'
@@ -47,6 +93,25 @@ def add_gems
   gem 'sitemap_generator', '~> 6.0', '>= 6.0.1'
   gem 'webpacker', '~> 3.5', '>= 3.5.3'
   gem 'whenever', require: false
+  gem 'simple_form'
+  gem 'draper'
+  gem 'rack-cors'
+  gem 'angularjs-rails'
+
+gem_group :development do
+  gem 'spring'
+  gem 'better_errors'
+  gem 'binding_of_caller'
+  gem 'quiet_assets'
+  gem 'pry-rails'
+  gem 'bullet'
+  gem 'traceroute'
+  gem 'letter_opener'
+  gem 'sqlite3'
+end
+gem_group :production do
+  gem 'pg'
+end
 end
 
 def set_application_name
